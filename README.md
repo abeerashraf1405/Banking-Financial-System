@@ -4,7 +4,7 @@ A full-scale relational database system for a banking application built with **O
 
 > **Course:** Database Systems (CL-2005) — FAST-NUCES, Chiniot-Faisalabad Campus  
 > **Session:** Spring 2026  
-> **Authors:** Abeer Ashraf (24F-0762) · Wania Khurram (24F-0751)
+> **Authors:** Abeer Ashraf · Wania Khurram 
 
 ---
 
