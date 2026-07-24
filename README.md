@@ -1,158 +1,148 @@
-# 🏦 Banking & Financial System
+# 🏦 Prime Bank - Banking & Financial Management System
 
-A full-scale relational database system for a banking application built with **Oracle SQL and PL/SQL**, featuring a normalized 20-table schema covering branch management, customer accounts, transactions, loan processing, and card services — with stored procedures, triggers, and views to automate business logic and enforce data integrity. Paired with a **C# Windows Forms GUI** for end-to-end usability.
+A full-featured desktop banking management system built with **C# Windows Forms** and an **Oracle SQL/PL-SQL** backend. It manages customers, accounts, transactions, loans, cards, employees, and branches through a clean, sidebar-navigated dashboard UI.
 
-> **Course:** Database Systems (CL-2005) — FAST-NUCES, Chiniot-Faisalabad Campus  
-> **Session:** Spring 2026  
-> **Authors:** Abeer Ashraf · Wania Khurram 
+## Overview
 
----
+Prime Bank is a console-free, GUI-driven banking application that models a real-world bank's core operations. It's backed by a normalized Oracle database with **18 tables**, **5 views**, and **9 stored procedures** that enforce business logic (balance checks, cascading inserts, audit logging) directly at the database layer, with the C# frontend calling into them.
 
-## 📁 Repository Structure
+## ✨ Features
 
-```
-├── project db.sql              # Full DDL + DML + procedures + triggers
-├── DB_Project_Report.docx      # Complete project report
-├── dbProject_form_gui.docx     # GUI implementation documentation
-├── dbProject_presentation.pptx # Project presentation slides
-├── eerdProject.drawio          # Entity-Relationship diagram
-└── sql_screenshot.docx         # Query execution screenshots
-```
+- 📊 **Dashboard** : live stats (total customers, active balance, active loans, active cards) plus the 10 most recent transactions
+- 👤 **Customers** : add and browse customer records
+- 💳 **Accounts** : open Checking/Saving/CD accounts, change account status (Active/Inactive/Closed)
+- 🔁 **Transactions** : Deposit, Withdraw, and Transfer funds between accounts
+- 💰 **Loans** : issue Mortgage/Car/Personal loans with type-specific detail fields, record loan payments against the current balance
+- 🪪 **Cards** : issue Credit or Debit cards with type-specific fields (credit limit & minimum payment, or PIN)
+- 🧑‍💼 **Employees** : view employee/branch listing, update salaries
+- 🏢 **Branches** : browse bank branch listing
+- 🎨 Consistent navy-and-gold themed UI shared across every screen via a central `UiTheme` helper
+- 🧩 Reusable dialog-building helpers so every "Add" form follows the same layout pattern
 
----
+## 🗄️ Database Design
 
-## 🗂️ Database Schema
+The schema is modeled with an Enhanced Entity-Relationship Diagram (`EERD.drawio`, open with [diagrams.net](https://app.diagrams.net/)) and implemented in `project_db.sql`.
 
-The system is built around **8 core entity groups** mapped to **20 relational tables**:
+### Tables
 
-| Entity Group | Tables | Purpose |
-|---|---|---|
-| Branch | `Bank_Branch` | Physical bank locations with contact info and manager references |
-| Employee | `Employee` | Staff records linked to branches |
-| Customer | `Customer` | Personal details of account holders |
-| Account | `Account`, `Checking_Account`, `Saving_Account`, `Certificate_of_Deposit` | All account types with type-specific sub-tables |
-| Transaction | `Bank_Transaction`, `Deposit`, `Withdrawal`, `Transfer` | All financial movements with type specialization |
-| Loan | `Loan`, `Mortgage`, `Car_Loan`, `Personal_Loan` | Loan records with sub-type details |
-| Card | `Card`, `Credit_Card`, `Debit_Card` | Payment cards with credit/debit specialization |
-| Audit | `Loan_Audit_Log` | Automatic audit trail for loan status changes |
-
-### Schema Dependency Tree
-
-```
-Bank_Branch ─┬─ Employee (BranchID)
-             └─ Account (BranchID)
-
-Customer ────┬─ Account (CusID)
-             ├─ Loan (CusID)
-             └─ Card (CusID)
-
-Account ─────┬─ Checking_Account / Saving_Account / Certificate_of_Deposit
-             ├─ Bank_Transaction
-             └─ Card
-
-Bank_Transaction ─┬─ Deposit
-                  ├─ Withdrawal
-                  └─ Transfer
-
-Loan ─────────┬─ Mortgage / Car_Loan / Personal_Loan
-Card ─────────┬─ Credit_Card / Debit_Card
-```
-
----
-
-## ⚙️ Key Features
-
-### ✅ Constraints & Integrity
-- `PRIMARY KEY` on all tables
-- `FOREIGN KEY` with referential integrity across all relationships
-- Deferrable FK on `Bank_Branch.ManagerEmpID` to resolve circular dependency with `Employee`
-- `CHECK` constraints on `TypeCode`, `Status`, and `LoanType`
-- `UNIQUE` on SSN fields; `NOT NULL` on all critical columns
-- `DEFAULT` values for `Balance`, `Status`, and `DateOpened`
-
----
-
-### 👁️ Views (5 Total)
-
-| View | Purpose |
+| Domain | Tables |
 |---|---|
-| `vw_Customer_Accounts` | Customer + account + branch summary per account |
-| `vw_Employee_Branch` | Employees with their branch city and state |
-| `vw_Active_Loans` | Active loans with customer and branch context |
-| `vw_Transaction_History` | Full auditable transaction log with customer and employee info |
-| `vw_Card_Holders` | Card details with cardholder name and linked account balance |
+| **Organization** | `Bank_Branch`, `Employee` |
+| **Customers & Accounts** | `Customer`, `Account`, `Checking_Account`, `Saving_Account`, `Certificate_of_Deposit` |
+| **Transactions** | `Bank_Transaction`, `Transfer`, `Deposit`, `Withdrawal` |
+| **Loans** | `Loan`, `Mortgage`, `Car_Loan`, `Personal_Loan`, `Loan_Audit_Log` |
+| **Cards** | `Card`, `Credit_Card`, `Debit_Card` |
 
----
+Account, loan, and card types use a **supertype/subtype (table-per-type)** design — e.g. every `Account` row has a matching detail row in exactly one of `Checking_Account`, `Saving_Account`, or `Certificate_of_Deposit`.
 
-### 🔧 Stored Procedures (10 Total)
+### Views
 
-| Procedure | Operation | Key Rules |
-|---|---|---|
-| `sp_AddCustomer` | INSERT Customer | Duplicate SSN guard |
-| `sp_AddAccount` | INSERT Account + sub-type | Routes by TypeCode to correct sub-table |
-| `sp_Deposit` | INSERT Transaction + Deposit | Amount must be positive; updates balance |
-| `sp_Withdrawal` | INSERT Transaction + Withdrawal | Checks balance + overdraft limit |
-| `sp_Transfer` | INSERT Transaction + Transfer | Atomically debits sender, credits receiver |
-| `sp_AddLoan` | INSERT Loan | Auto-sets StartDate and EndDate |
-| `sp_UpdateAccountStatus` | UPDATE Account | Changes Active/Inactive/Closed |
-| `sp_UpdateSalary` | UPDATE Employee | Salary must be positive |
-| `sp_DeleteAccount` | DELETE Account | Requires zero balance before deletion |
-| `sp_UpdateLoanBalance` | UPDATE Loan | Auto-closes loan when balance reaches 0 |
+- `vw_Customer_Accounts` : accounts joined with owning customer
+- `vw_Employee_Branch` : employees joined with their branch
+- `vw_Active_Loans` : currently active loans
+- `vw_Transaction_History` : unified transaction feed across deposits, withdrawals, and transfers
+- `vw_Card_Holders` : cards joined with their holding customer
 
----
+### Stored Procedures
 
-### ⚡ Triggers (6 Total)
-
-| Trigger | Event | Purpose |
-|---|---|---|
-| `trg_Account_DateOpened` | INSERT on Account | Auto-sets `DateOpened = SYSDATE` if null |
-| `trg_Prevent_Negative_Balance` | UPDATE on Account | Blocks balance below overdraft limit |
-| `trg_Loan_Status_Change` | UPDATE on Loan | Writes old/new status to `Loan_Audit_Log` |
-| `trg_Block_Account_Delete` | DELETE on Account | Blocks deletion if balance ≠ 0 or status is Active |
-| `trg_Card_Expiry_Check` | INSERT/UPDATE on Card | Auto-sets `Status = Expired` when `ExpDate < SYSDATE` |
-| `trg_Validate_Transaction` | INSERT on Bank_Transaction | Raises error if `Amount <= 0` |
-
----
-
-## 🖥️ GUI Application (C# Windows Forms)
-
-A Windows Forms app built in **C# (.NET)** connects to Oracle XE via `Oracle.ManagedDataAccess` and calls all stored procedures through a clean graphical interface.
-
-| Form | Purpose |
+| Procedure | Purpose |
 |---|---|
-| `LoginForm` | Employee authentication via email + SSN |
-| `DashboardForm` | Central navigation hub to all modules |
-| `CustomerForm` | Full CRUD on customer records |
-| `AccountForm` | Add, search, and update accounts |
-| `TransactionForm` | Process deposits, withdrawals, and transfers |
-| `LoanForm` | Add loans and process payments |
-| `EmployeeForm` | Search employees and update salaries |
+| `sp_AddCustomer` | Insert a new customer |
+| `sp_AddAccount` | Open a new account |
+| `sp_Deposit` | Process a deposit and log the transaction |
+| `sp_Withdrawal` | Process a withdrawal (with PIN check) |
+| `sp_Transfer` | Move funds between two accounts |
+| `sp_AddLoan` | Create a new loan |
+| `sp_UpdateAccountStatus` | Change an account's status |
+| `sp_UpdateSalary` | Update an employee's salary |
+| `sp_DeleteAccount` | Remove an account |
+| `sp_UpdateLoanBalance` | Apply a payment to a loan's current balance |
 
----
+Procedures handle their own error control internally (`WHEN OTHERS THEN ROLLBACK`), so the C# layer verifies success by re-querying (`DbHelper.RowExists`) rather than relying solely on thrown exceptions.
 
-## 🧪 Testing
+## 🧰 Tech Stack
 
-All stored procedures were tested with valid and invalid inputs. All triggers were tested via direct DML. **16 test cases — 16 PASS.**
+- **C# / .NET** : Windows Forms desktop application
+- **Oracle Database** : data storage, business logic (PL/SQL procedures & views)
+- **Oracle.ManagedDataAccess.Client** : ADO.NET driver for Oracle connectivity
+- **draw.io / diagrams.net** : EERD schema diagram
 
-| Range | What Was Tested |
-|---|---|
-| T-01 to T-10 | Stored procedure tests (valid inputs, error conditions, edge cases) |
-| T-11 to T-16 | Trigger tests (auto-set fields, balance guards, audit log, expiry check) |
+## 📁 Project Structure
 
----
-
-## 🛠️ Tech Stack
-
-- **Database:** Oracle SQL · PL/SQL (Oracle XE)
-- **GUI:** C# · .NET · Windows Forms · Oracle.ManagedDataAccess
-- **Diagramming:** draw.io (EERD)
-
----
+```
+bank-management-system/
+├── Program.cs                    # Application entry point
+├── MainForm.cs                   # Main shell: sidebar nav, dashboard, list pages
+├── DbHelper.cs                   # Centralized DB access (queries, procedures, connection)
+├── UiTheme.cs                    # Shared colors, fonts, and styled control factories
+├── DialogHelper.cs               # Reusable form-field layout helpers for dialogs
+├── AddCustomerForm.cs            # Add Customer dialog
+├── AddAccountForm.cs             # Open New Account dialog
+├── AddLoanForm.cs                # Add New Loan dialog (type-specific fields)
+├── AddCardForm.cs                # Issue New Card dialog (Credit/Debit specific fields)
+├── DepositForm.cs                # Deposit dialog
+├── WithdrawalForm.cs             # Withdrawal dialog
+├── TransferForm.cs               # Transfer dialog
+├── LoanPaymentForm.cs            # Record Loan Payment dialog
+├── UpdateAccountStatusForm.cs    # Change Account Status dialog
+├── UpdateSalaryForm.cs           # Update Employee Salary dialog
+├── project_db.sql                # Full Oracle schema: tables, views, procedures
+├── EERD.drawio                   # Enhanced ER Diagram (draw.io source file)
+└── README.md
+```
 
 ## 🚀 Getting Started
 
-1. Install **Oracle XE** and open SQL*Plus or SQL Developer.
-2. Run `project db.sql` to create all tables, insert sample data, and set up procedures, views, and triggers.
-3. Open the C# solution in Visual Studio.
-4. Update the connection string in `DBHelper.cs` to match your Oracle credentials.
-5. Build and run — log in with any employee's email and SSN.
+### Prerequisites
+
+- Windows with **.NET Framework / .NET Desktop Runtime** (Windows Forms support)
+- **Oracle Database** (e.g. Oracle XE) running locally or accessible on the network
+- **Oracle.ManagedDataAccess** NuGet package installed in the project
+- Visual Studio (recommended) or another C# IDE with Windows Forms designer support
+
+### 1. Set Up the Database
+
+```sql
+-- Connect to your Oracle instance as the target schema user, then run:
+@project_db.sql
+```
+
+This creates all tables, views, and stored procedures.
+
+### 2. Configure the Connection String
+
+Update the connection string in `DbHelper.cs` with your own Oracle credentials:
+
+```csharp
+private static string connStr =
+    "User Id=YOUR_USER;Password=YOUR_PASSWORD;Data Source=localhost:1521/xe;";
+```
+
+> ⚠️ **Security note:** the current code has credentials hardcoded directly in `DbHelper.cs`. Before pushing to GitHub, replace these with environment variables, a config file excluded via `.gitignore`, or a secrets manager and rotate the exposed password.
+
+### 3. Build & Run
+
+Open the solution in Visual Studio, restore the `Oracle.ManagedDataAccess` NuGet package, and run the project (`Program.cs` is the entry point). The app opens maximized with the sidebar dashboard.
+
+## 🖥️ Usage
+
+| Screen | What you can do |
+|---|---|
+| **Dashboard** | View live totals and the 10 most recent transactions |
+| **Customers** | Add a new customer |
+| **Accounts** | Open a new account, change an account's status |
+| **Transactions** | Deposit, withdraw, or transfer funds |
+| **Loans** | Add a loan, record a payment against a selected loan |
+| **Cards** | Issue a new credit or debit card |
+| **Employees** | Update a selected employee's salary |
+| **Branches** | Browse all branches |
+
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## 👤 Author
+
+**Abeer Ashraf**
+Computer Science Undergraduate @ FAST-NUCES
